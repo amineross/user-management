@@ -7,7 +7,7 @@
 </head>
 <body>
     <div class="register-container">
-        <form action="login.php?route=signup" method="post">
+        <form action="register.php?route=signup" method="post">
             <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
             <div>
                 <label for="nom">Last Name:</label>
