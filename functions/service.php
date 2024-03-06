@@ -1,104 +1,105 @@
 <?php
 
-function processRegistration() {
+function handleRegisterAction() {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Check CSRF token
-        checkCsrfToken(); 
 
-        // Collect form data
-        $lastName = sanitizeInput($_POST['nom']); 
-        $firstName = sanitizeInput($_POST['prenom']); 
-        $address = sanitizeInput($_POST['adresse']); 
-        $userEmail = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL); 
-        $userPassword = $_POST['password']; 
-        $passwordConfirmation = $_POST['confirm_password']; 
+        functions\verifyCsrfToken();
 
-        // Validate form data
-        $formErrors = validateRegistrationForm($lastName, $firstName, $address, $userEmail, $userPassword, $passwordConfirmation); // Changed function call
+        $nom = functions\sanitizeInput($_POST['nom']);
+        $prenom = functions\sanitizeInput($_POST['prenom']);
+        $adresse = functions\sanitizeInput($_POST['adresse']);
+        $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
+        $password = $_POST['password'];
+        $confirmPassword = $_POST['confirm_password'];
 
-        if (!empty($formErrors)) {
-            // Pass errors to the form data array
-            $formData['errors'] = $formErrors;
-            include 'templates/register.php';
+        $errors = functions\validateRegistrationForm($nom, $prenom, $adresse, $email, $password, $confirmPassword);
+
+        if (!empty($errors)) {
+
+            $data['errors'] = $errors;
+            include_once 'templates/register.php';
         } else {
-            // Attempt to register the user
-            $registrationError = createUser($lastName, $firstName, $address, $userEmail, $userPassword, $passwordConfirmation); // Changed function name
 
-            if ($registrationError === true) {
-                header("Location: index.php?route=signin");
+            $error = registerUser($nom, $prenom, $adresse, $email, $password, $confirmPassword);
+
+            if ($error === true) {
+                header("Location: index.php?action=login");
                 exit();
             } else {
-                // Display errors on the registration page
-                $formData['error'] = $registrationError;
-                include 'templates/register.php';
+
+                $data['error'] = $error;
+                include_once 'templates/register.php';
             }
         }
     } else {
-        include 'templates/register.php';
+
+        include_once 'templates/register.php';
     }
 }
 
-function processLogin() {
+function handleLoginAction() {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // CSRF token verification
-        checkCsrfToken();
 
-        $userEmail = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
-        $userPassword = $_POST['password']; 
+        functions\verifyCsrfToken();
 
-        $loginError = authenticateUser($userEmail, $userPassword);
+        $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
+        $password = $_POST['password'];
 
-        if ($loginError === true) {
-            header("Location: index.php?route=profile");
+        $error = loginUser($email, $password);
+
+        if($error === true){
+            header("Location: index.php?action=dashboard");
             exit();
         } else {
-            include 'templates/login.php';
+            include_once 'templates/login.php';
         }
     } else {
-        include 'templates/login.php';
+        include_once 'templates/login.php';
     }
 }
 
-function processUpdateProfile() {
+function handleUpdateAction() {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        checkCsrfToken();
 
-        $userId = $_SESSION['user_id']; 
-        $lastName = sanitizeInput($_POST['nom']);
-        $firstName = sanitizeInput($_POST['prenom']);
-        $address = sanitizeInput($_POST['adresse']);
-        $userEmail = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
-        $userPassword = $_POST['password'];
-        $passwordConfirmation = $_POST['confirm_password'];
+        \functions\verifyCsrfToken();
 
-        $formErrors = validateRegistrationForm($lastName, $firstName, $address, $userEmail, $userPassword, $passwordConfirmation);
+        $id = $_SESSION['user_id'];
+        $nom = functions\sanitizeInput($_POST['nom']);
+        $prenom = functions\sanitizeInput($_POST['prenom']);
+        $adresse = functions\sanitizeInput($_POST['adresse']);
+        $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
+        $password = $_POST['password'];
+        $confirmPassword = $_POST['confirm_password'];
 
-        if (!empty($formErrors)) {
-            $formData['errors'] = $formErrors;
-            include 'templates/update.php';
+        $errors = functions\validateRegistrationForm($nom, $prenom, $adresse, $email, $password, $confirmPassword);
+
+        if (!empty($errors)) {
+            $data['errors'] = $errors;
+            include_once 'templates/update.php';
         } else {
-            $updateError = updateUserDetails($userId, $lastName, $firstName, $address, $userEmail, $userPassword, $passwordConfirmation);
 
-            if ($updateError === true) {
-                header("Location: index.php?route=profile");
+            $error = updateUserInfo($id, $nom, $prenom,$adresse, $email, $password, $confirmPassword);
+
+            if ($error === true) {
+                header("Location: index.php?action=dashboard");
                 exit();
             } else {
-                $formData['error'] = $updateError;
-                include 'templates/update.php';
+                include_once 'templates/update.php';
             }
         }
+
     } else {
-        include 'templates/update.php';
+        include_once 'templates/update.php';
     }
 }
 
-function processAccountClosure() {
+function handleCloseAction() {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $userId = $_SESSION['user_id'];
+        $id = $_SESSION['user_id'];
 
-        checkCsrfToken();
+        functions\verifyCsrfToken();
 
-        removeUserAccount($userId);
+        closeAccount($id);
 
         session_destroy();
 
@@ -107,13 +108,12 @@ function processAccountClosure() {
     }
 }
 
-function processLogout() {
+function handleLogoutAction() {
+
     session_destroy();
+
     header("Location: index.php");
     exit();
 }
 
-function showDashboard()
-{
-    include 'templates/dashboard.php';
-}
+?>

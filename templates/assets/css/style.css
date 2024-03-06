@@ -23,8 +23,14 @@ header, footer {
 }
 
 header {
-    position: fixed;
-    top: 0;
+    position: sticky;
+    top: 0px;
+    height: 220px;
+}
+
+ul {
+    list-style: none;
+    margin: 0;
 }
 
 footer {

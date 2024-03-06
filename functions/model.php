@@ -1,79 +1,144 @@
 <?php
 include_once 'security.php';
+include_once 'service.php';
 
-function dbConnect() {
-    $pdo = new PDO('mysql:host=localhost;dbname=user_management', 'root', '', [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-    ]);
-    return $pdo;
-}
-
-function createUser($lastName, $firstName, $address, $userEmail, $userPassword, $passwordConfirmation) {
-    $pdo = dbConnect();
-    $role = 2; 
-
-    if ($userPassword !== $passwordConfirmation) {
-        return "password_mismatch";
+function dbConnect(){
+    try{
+        $pdo = new PDO('mysql:host=localhost;dbname=esiea_web', 'root', 'root');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        return $pdo;
+    }catch(Exception $e){
+        throw new Exception('Erreur lors de la connexion à la base de données : ' . $e->getMessage());
     }
+}   
 
-    $stmt = $pdo->prepare("SELECT id FROM utilisateurs WHERE email = ?");
-    $stmt->execute([$userEmail]);
-    if ($stmt->fetch()) {
-        return "email_exists";
-    }
-
-    $hashedPassword = password_hash($userPassword, PASSWORD_DEFAULT);
-    $stmt = $pdo->prepare("INSERT INTO utilisateurs (nom, prenom, adresse, email, password, role) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$lastName, $firstName, $address, $userEmail, $hashedPassword, $role]);
-    return true;
-}
-
-function authenticateUser($userEmail, $userPassword) {
-    $pdo = dbConnect();
-    $stmt = $pdo->prepare("SELECT id, email, password FROM utilisateurs WHERE email = ?");
-    $stmt->execute([$userEmail]);
-    $user = $stmt->fetch();
-
-    if ($user && password_verify($userPassword, $user['password'])) {
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['email'] = $user['email'];
-        return true;
-    }
-    return "wrong_email_password";
-}
-
-function fetchUserDetails($userId) {
-    $pdo = dbConnect();
-    $stmt = $pdo->prepare("SELECT id, nom, prenom, adresse, email FROM utilisateurs WHERE id = ?");
-    $stmt->execute([$userId]);
-    return $stmt->fetch();
-}
-
-function updateUserDetails($userId, $lastName, $firstName, $address, $userEmail, $userPassword, $passwordConfirmation) {
+function registerUser($nom, $prenom, $adresse, $email, $password, $confirmPassword) {
     $pdo = dbConnect();
 
-    if ($userPassword !== $passwordConfirmation) {
-        return "password_mismatch";
-    }
+    $defaultRole = 2; 
 
-    if ($userEmail !== $_SESSION['email']) {
-        $stmt = $pdo->prepare("SELECT id FROM utilisateurs WHERE email = ? AND id != ?");
-        $stmt->execute([$userEmail, $userId]);
-        if ($stmt->fetch()) {
+    functions\verifyCsrfToken();
+    try {
+
+        $stmt = $pdo->prepare("SELECT id FROM utilisateurs WHERE email = ?");
+        $stmt->execute([$email]);
+        $existingUser = $stmt->fetch();
+
+        if ($existingUser) {
+
             return "email_exists";
+        } elseif ($password !== $confirmPassword) {
+
+            return "password_mismatch";
+        } else {
+
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("INSERT INTO utilisateurs (nom, prenom, adresse, email, password, role) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$nom, $prenom, $adresse, $email, $hashedPassword, $defaultRole]);
+            return true;
         }
+    } catch (Exception $e) {
+        throw new Exception("Erreur lors de l'enregistrement de l'utilisateur : " . $e->getMessage());
     }
-
-    $hashedPassword = password_hash($userPassword, PASSWORD_DEFAULT);
-    $stmt = $pdo->prepare("UPDATE utilisateurs SET nom = ?, prenom = ?, adresse = ?, email = ?, password = ? WHERE id = ?");
-    $stmt->execute([$lastName, $firstName, $address, $userEmail, $hashedPassword, $userId]);
-    $_SESSION['email'] = $userEmail;
-    return true;
 }
 
-function removeUserAccount($userId) {
+function loginUser($email, $password) {
     $pdo = dbConnect();
-    $stmt = $pdo->prepare("DELETE FROM utilisateurs WHERE id = ?");
-    $stmt->execute([$userId]);
-    session_destroy();
+
+    try {
+
+        $stmt = $pdo->prepare("SELECT id, email, password FROM utilisateurs WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        if ($user && password_verify($password, $user['password'])) {
+
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['email'] = $user['email'];
+
+            return true;
+        } else {
+
+            return "wrong_email_password";
+        }
+    } catch (Exception $e) {
+        throw new Exception("Erreur lors de la connexion de l'utilisateur : " . $e->getMessage());
+    }
 }
+
+function getUserInfos($id) {
+    $pdo = dbConnect();
+
+    try {
+
+        $stmt = $pdo->prepare("SELECT id, nom, prenom, adresse, email FROM utilisateurs WHERE id = ?");
+        $stmt->execute([$id]);
+        $userInfo = $stmt->fetch();
+
+        return $userInfo;
+    } catch (Exception $e) {
+        throw new Exception("Erreur lors de la récupération des informations de l'utilisateur : " . $e->getMessage());
+    }
+}
+
+function updateUserInfo($id, $nom, $prenom, $adresse, $email, $password, $confirmPassword){
+    $pdo = dbConnect();
+
+    functions\verifyCsrfToken();
+
+    try {
+
+        if($email === $_SESSION['email']){
+            if ($password !== $confirmPassword) {
+                return "password_mismatch";
+
+            } else {
+                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+
+                $stmt = $pdo->prepare("UPDATE utilisateurs SET nom = ?, prenom = ?, adresse = ?, email = ?, password = ? WHERE id = ?");
+                $stmt->execute([$nom, $prenom, $adresse, $email, $hashedPassword, $id]);
+                return true;
+            }
+        } else {
+            $stmt = $pdo->prepare("SELECT id FROM utilisateurs WHERE email = ?");
+            $stmt->execute([$email]);
+            $existingUser = $stmt->fetch();
+
+            if ($existingUser) {
+                return "email_exists";
+
+            } elseif ($password !== $confirmPassword) {
+                return "password_mismatch";
+
+            } else {
+                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+
+                $stmt = $pdo->prepare("UPDATE utilisateurs SET nom = ?, prenom = ?, adresse = ?, email = ?, password = ? WHERE id = ?");
+                $stmt->execute([$nom, $prenom, $adresse, $email, $hashedPassword, $id]);
+                $_SESSION['email'] = $email;
+
+                return true;
+            }
+        }
+
+    } catch (Exception $e) {
+        throw new Exception("Erreur lors de la modification des informations de l'utilisateur : " . $e->getMessage());
+    }
+}
+
+function closeAccount($id) {
+    $pdo = dbConnect(); 
+
+    try {
+
+        $stmt = $pdo->prepare("DELETE FROM utilisateurs WHERE id = ?");
+        $stmt->execute([$id]);
+
+        session_destroy();
+        header("Location: index.php");
+        exit();
+    } catch (Exception $e) {
+        throw new Exception("Erreur lors de la fermeture du compte de l'utilisateur : " . $e->getMessage());
+    }
+}
+?>
