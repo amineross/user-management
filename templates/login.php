@@ -1,6 +1,6 @@
 <!-- login.php -->
 <main>
-    <section>
+    <section class="container">
         <h1>Connexion</h1>
         <form action="index.php?action=login" method="post">
             <?php if (isset($_SESSION['csrf_token'])) : ?>
@@ -11,14 +11,14 @@
             <?php endif; ?>
             <label for="email">Email:</label>
             <input type="email" id="email" name="email" required>
-            <label for="password">Mot de passe:</label>
+            <label for="password">Password:</label>
             <input type="password" id="password" name="password" required>
             <?php
                 if (isset($error) && $error === 'wrong_email_password') {
-                    echo "<p class='error-message'>Email ou mot de passe incorrect.</p>";
+                    echo "<p class='error-message'>Incorrect email or password</p>";
                 }
             ?>
-            <button type="submit">Se connecter</button>
+            <button type="submit">Log in</button>
         </form>
     </section>
 </main>
